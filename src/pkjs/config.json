@@ -1,0 +1,12 @@
+[
+    {
+        "type": "email",
+        "id": "username",
+        "label": "Honeywell Username"
+    },
+    {
+        "type": "password",
+        "id": "password",
+        "label": "Honeywell Password"
+    }
+]

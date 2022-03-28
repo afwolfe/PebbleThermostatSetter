@@ -1,3 +1,10 @@
+const Clay = require('pebble-clay');
+const MessageQueue= require('message-queue-pebble');
+const messageKeys = require('message_keys');
+
+const clayConfig = require('./config.json');
+const clay = new Clay(clayConfig);
+
 // Called as soon as application is ready. It initializes data.
 Pebble.addEventListener("ready", function(e) {
     console.log("Initializing thermostat data ...");

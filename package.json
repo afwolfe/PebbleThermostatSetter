@@ -1,0 +1,68 @@
+{
+  "name": "ThermoSetterREST",
+  "author": "Alex Wolfe",
+  "version": "1.0.0",
+  "keywords": [
+    "pebble-app"
+  ],
+  "private": true,
+  "dependencies": {
+    "message-queue-pebble": "^1.0.0",
+    "pebble-clay": "^1.0.4"
+  },
+  "pebble": {
+    "displayName": "ThermoSetterREST",
+    "uuid": "57b165cc-1b61-4955-a6a4-4de6960bae45",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite"
+    ],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": [
+      "temperatureChange",
+      "thermostatIndex",
+      "thermostatId",
+      "thermostatName",
+      "thermostatTemperature"
+    ],
+    "capabilities": [
+      "configurable"
+    ],
+    "resources": {
+      "media": [
+        {
+          "type": "png",
+          "name": "UP",
+          "file": "img/up.png"
+        },
+        {
+          "type": "png",
+          "name": "DOWN",
+          "file": "img/down.png"
+        },
+        {
+          "type": "png",
+          "name": "SELECTOR",
+          "file": "img/selector.png"
+        },
+        {
+          "type": "png",
+          "name": "THERMOMETER",
+          "file": "img/thermometer.png"
+        },
+        {
+          "type": "png",
+          "name": "MENUICON",
+          "file": "img/menuicon.png",
+          "menuIcon": true
+        }
+      ]
+    }
+  }
+}

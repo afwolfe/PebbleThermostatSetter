@@ -132,7 +132,7 @@ static void click_config_provider(void *context) {
 static void initialize_ui(void) {
   s_window = window_create();
   window_set_background_color(s_window, GColorBlack);
-  window_set_fullscreen(s_window, false);
+  window_stack_push(s_window, false);
   
   s_res_up = gbitmap_create_with_resource(RESOURCE_ID_UP);
   s_res_selector = gbitmap_create_with_resource(RESOURCE_ID_SELECTOR);

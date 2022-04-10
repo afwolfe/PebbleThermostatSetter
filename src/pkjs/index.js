@@ -1,12 +1,23 @@
-const Clay = require('pebble-clay');
-const MessageQueue= require('message-queue-pebble');
-const messageKeys = require('message_keys');
+// const Clay = require('pebble-clay');
+// const messageKeys = require('message_keys');
 
-const clayConfig = require('./config.json');
-const clay = new Clay(clayConfig);
+// const clayConfig = require('./config.json');
+// const clay = new Clay(clayConfig);
+const config = require("./config.js");
+const DEBUG = 3;
+
+var baseUrl;
+var savedToken = null;
+var thermostats;
+var endpoints;
+
 
 // Called as soon as application is ready. It initializes data.
 Pebble.addEventListener("ready", function(e) {
+    baseUrl = config.baseUrl;
+    thermostats = config.thermostats;
+    endpoints = config.endpoints;
+
     console.log("Initializing thermostat data ...");
     initializeThermostatData();
 });
@@ -26,7 +37,7 @@ function changeTemperature(thermostatId, temperatureChange, thermostatIndex){
     console.log("Requesting temperature change: " + temperatureChange
         + ", for thermostat: " + thermostatId);
 
-    login(function(){
+    loginIfNecessary(function(){
         getTemperature(thermostatId, function(currentTemperature, success){
             var thermostatData = {"thermostatIndex": thermostatIndex},
                 newTemperature;
@@ -55,47 +66,44 @@ function changeTemperature(thermostatId, temperatureChange, thermostatIndex){
 }
 
 // Gets the temperature of a thermostat
-function getTemperature(thermostatId, callbackFn){
+function getTemperature(thermostatId, callback){
+    var endpoint = prepareToCallEndpoint("getTemperature", thermostatId);
     ajaxCall({
-        url: 'https://rs.alarmnet.com/TotalConnectComfort/Device/CheckDataSession/'
-            + thermostatId,
-        headers: {'X-Requested-With': 'XMLHttpRequest'},
-        callback: function(){
+        url: baseUrl + endpoint.url,
+        method: endpoint.method,
+        headers: endpoint.headers,
+        callback: function(data){
             var success = true,
-                temperature = 0,
-                response = this.responseText;
+                temperature = 0;
+                // response = this.responseText;
 
             try {
-                temperature = JSON.parse(response).latestData.uiData.CoolSetpoint;
+                // var data = JSON.parse(response);
+
+                temperature = extractVariable(data, endpoint.value);
                 console.log("Thermostat " + thermostatId
                     + " current temperature: " + temperature);
             }
             catch (e){
                 console.error('Unable to get current temperature for thermostat '
                     + thermostatId + ". Error: " + e);
-                console.log("Response text: " + response);
+                console.log("Response text: " + data);
                 success = false;
             }
 
-            callbackFn(temperature, success);
+            callback(temperature, success);
         }
     });
 }
 
 // Sets the temperature of a thermostat
-function setTemperature(thermostatId, temperature, callbackFn){
+function setTemperature(thermostatId, temperature, callback){
+    var endpoint = prepareToCallEndpoint("setTemperature", thermostatId, temperature);
     ajaxCall({
-        url: 'https://rs.alarmnet.com/TotalConnectComfort/Device/SubmitControlScreenChanges',
-        params: JSON.stringify({
-            DeviceID: parseInt(thermostatId),
-            CoolSetPoint: temperature
-        }),
-        method: 'POST',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Content-Type': 'application/json; charset=UTF-8'
-        },
-        callback: function(){
+        url: baseUrl + endpoint.url,
+        method: endpoint.method,
+        headers: endpoint.headers,
+        callback: function(data){
             var response = this.responseText,
                 success;
 
@@ -112,137 +120,142 @@ function setTemperature(thermostatId, temperature, callbackFn){
                 success = false;
             }
 
-            callbackFn(success);
+            callback(success);
         }
     });
 }
 
-// Logs in into the Honeywell site using the credentials saved in localStorage
-function login(callbackFn){
-    console.log("Connecting as user: "+localStorage.honeywellUsername);
-    ajaxCall({
-        url: 'https://rs.alarmnet.com/TotalConnectComfort/',
-        params: 'UserName=' + localStorage.honeywellUsername
-            + '&Password=' + localStorage.honeywellPassword
-            + '&timeOffset=240',
-        method: 'POST',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        callback: callbackFn
-    });
+// Logs in into the login endpoint and stores the token
+function loginIfNecessary(callback){
+    if (savedToken === null && endpoints.hasOwnProperty("login")) {
+        console.log("Logging in");
+        var endpoint = prepareToCallEndpoint("login");
+        ajaxCall({
+            url: baseUrl + endpoint.url,
+            body: endpoint.body,
+            method: endpoint.method,
+            headers: endpoint.headers,
+            callback: function(data) {
+                console.log("Logged in.");
+                // var response = JSON.parse(this.responseText);
+                savedToken = "Bearer " + extractVariable(data, endpoint.value);
+                if (DEBUG > 2) { console.log(savedToken); }
+            }
+        });
+    }
+
+    callback();
 }
 
 // Initializes the thermostat data with login response data
 function initializeThermostatData(){
-    login(function(){
-        var parsedResponse = parseLoginResponse(this.responseText),
-            thermostats = parsedResponse.thermostats,
-            thermostatsCount = thermostats.length,
-            thermostat,
-            i;
+    loginIfNecessary(function(){
+        var thermostatsCount = thermostats.length;
 
         if (thermostatsCount > 0){
-            for (i = 0; i < thermostatsCount; i++){
-                thermostat = {
-                    "thermostatIndex": i,
-                    "thermostatId": thermostats[i].id,
-                    "thermostatName": thermostats[i].name,
-                };
+            // for (var i = 0; i < thermostatsCount; i++){
+            //     var thermostat = {
+            //         "thermostatIndex": i,
+            //         "thermostatId": thermostats[i].id,
+            //         "thermostatName": thermostats[i].name,
+            //     };
 
                 // Get the target (desired) temperature per each thermostat and
                 // send the data for each thermostat to the watch at 1 second intervals
-                setTimeout(function(thermostatData){
-                    getTemperature(thermostatData.thermostatId, function(temperature){
-                        thermostatData.thermostatTemperature =
-                            encodeTemperature(temperature);
-                        Pebble.sendAppMessage(thermostatData);
+            setTimeout(function() {
+                for (var i = 0; i < thermostatsCount; i++) {
+                    var thermostat = {
+                        "thermostatIndex": i,
+                        "thermostatId": thermostats[i].id,
+                        "thermostatName": thermostats[i].name,
+                    };
+                    getTemperature(thermostat["thermostatId"], function(temperature) {
+                        thermostat["thermostatTemperature"] = encodeTemperature(temperature);
+                        Pebble.sendAppMessage(thermostat);
                     });
-                }, i*1000, thermostat);
-            }
+                }
+            }, 1000);
         }
         else {
-            console.log("Error when trying to log in Honeywell site.");
-            console.log("Response text: " + this.responseText);
-            console.log("Response status: " + this.status);
-            console.log("Response Errors: " + parsedResponse.errors.join());
+            console.log("No thermostats found.");
         }
     });
 }
 
 // Parses the login call response. Returns the thermostats data if the
 // call was successful. Otherwise returns the errors.
-function parseLoginResponse(htmlString){
-    var response = document.createElement("div"),
-        thermostats = [],
-        errors = [],
-        nodeList,
-        nodeListLength,
-        i;
-
-    response.innerHTML = htmlString;
-    nodeList = response.querySelectorAll('[data-id]');
-    nodeListLength = nodeList.length;
-
-    for (i = 0; i < nodeListLength; i++){
-        thermostats.push({
-            id: nodeList[i].getAttribute('data-id'),
-            indoorTemperature: parseInt(nodeList[i].querySelector('.tempValue')
-                .innerText.trim()),
-            name: nodeList[i].querySelector('.location-name').innerText.trim()
-                .toLowerCase().replace(/^./, function(m){return m.toUpperCase();})
-        });
-    }
-
-    if (nodeListLength < 1){
-        nodeList = response.getElementsByClassName('validation-summary-errors');
-        nodeListLength = nodeList.length;
-        for (i = 0; i < nodeListLength; i++){
-            errors.push(nodeList[i].innerHTML);
-        }
-    }
-
-    return {
-        thermostats: thermostats,
-        errors: errors
-    }
-}
 
 // Converts temperature to string and adds symbol °
 function encodeTemperature(temperature){
-    return temperature + "\u00B0"; // Unicode for °
+
+    return convert("c", "f", temperature).toFixed(1) + "\u00B0"; // Unicode for °
 }
 
-// -------------- Configuration ----------------
-// This configuration section generates an html 
-// form on the fly to save into HTML5 local storage
-// the username and password of the Honeywell
-// website that receives commands to query and
-// update the thermostat data.
-// Once they are saved, they are used by default
-// to submit those commands
+// Substitutes the variables in the endpoint and returns the updated endpoint object.
+function prepareToCallEndpoint(endpointName, thermostatId, temperature) {
+    
+    if (endpoints[endpointName]) {
+        var tempEndpoint = endpoints[endpointName];
+        // tempEndpoint.url = substituteVariable(tempEndpoint.url, thermostatId, temperature);
+        if (endpointName == "getTemperature") {
+            tempEndpoint.url = "/api/accessories/" + thermostatId
+        }
+        // tempEndpoint.body = substituteVariable(tempEndpoint.body, thermostatId, temperature);
+        if (endpointName == "setTemperature") {
+            tempEndpoint.body = {
+                "characteristicType": "TargetTemperature",
+                "value": temperature
+            }
+        }
+        return tempEndpoint;
+    } 
+}
 
-Pebble.addEventListener("showConfiguration", function() {
-  console.log("Showing configuration");
-  Pebble.openURL('data:text/html,<html> <head> <meta name="viewport" content="width=device-width, initial-scale=1"> <style> * {font-family:verdana; font-size: 20px} input {border: 2px solid #a1a1a1; border-radius: 5px;} label, .grp {display: block; padding: 5px;} h1 {background: #85A3FF; padding: 10px} </style> </head> <body> <h1>Honeywell Site Credentials</h1> <form action="pebblejs://close#"> <div class="grp"><label>Username:</label><input type="email" name="u" placeholder="user@email.com" value="'+(localStorage.honeywellUsername||'')+'" ></div> <div class="grp"><label>Password:</label><input type="password" name="p"></div> <div class="grp" style="padding-top:30px;"> <input type="submit" onclick="var f=document.forms[0], params={\'username\': f.u.value, \'password\': f.p.value}; f.action += encodeURIComponent(JSON.stringify(params));"> <input type="submit" value="Cancel"> </div> </form> </body> </html><!--.html');
-});
+function substituteVariable(str, thermostatId, temperature) {
+    if (thermostatId) {
+        str = str.replaceAll("${ThermostatId}", thermostatId);
+    }
+    if (temperature) {
+        str = str.replaceAll("${TargetTemperature}", temperature);
+    }
+    return str;
+}
 
-Pebble.addEventListener("webviewclosed", function(e) {
-  var params = JSON.parse(decodeURIComponent(e.response));
+function extractVariable(data, variable) {
+    try {
+        var variable_split = variable.split(".")
+            for (var j in variable_split) {
+            data = data[variable_split[j]];
+            }
+        if (data) {
+            if (DEBUG > 1) { console.log("Found variable " + variable + " in response"); } 
+        }
+    }
+    catch (e) {
+        if (DEBUG > 0) { console.log("Failed to extract variable" + variable + " from response."); } 
+    }
+    return data;
+}
 
-  // Store credentials in a localStorage object
-  if (params.username && params.password){
-    localStorage.honeywellUsername = params.username;
-    localStorage.honeywellPassword = params.password;
-    console.log("Stored credentials for: " + localStorage.honeywellUsername);
-  }
-});
-// ----------- End of Configuration -------------
+function convert(from, to, temperature) {
+    if (from.toLowerCase() === "c") {
+        if (to.toLowerCase() === "f") {
+            return temperature * 1.8 + 32;
+        }
+        else if (to.toLowerCase() === "k") {
+            return temperature + 273.15;
+        }
+    }
+}
 
 
 // A helper function to make ajax Calls
 function ajaxCall(options){
+    console.log(options.url);
     var xhr = new XMLHttpRequest(),
         method = (options.method || 'GET').toUpperCase(),
         headers = options.headers,
+        body = options.body,
         params = options.params,
         url = options.url + (method === 'GET' && params ? '?' + params : '');
 
@@ -254,9 +267,36 @@ function ajaxCall(options){
             xhr.setRequestHeader(key, headers[key]);
         });
     }
+    if (savedToken) {
+        if (DEBUG > 1) { console.log("Setting Authorization header with stored token."); }
+        xhr.setRequestHeader("Authorization", savedToken);
+    }
 
-    xhr.onload = options.callback;
-    xhr.onerror = function(e){ console.error(e); }
+    xhr.onload = function() {
+        if(this.status < 400) {
+            var data = JSON.parse(this.responseText);
+            options.callback(data);
+        }
+        else {
+            console.log(this.status);
+        }
+    }
+    xhr.onerror = function(e) {
+        console.error(e);
+        if (savedToken) {
+            savedToken = null;
+        }
+    }
 
-    xhr.send(method === 'POST' ? params : null);
+    xhr.timeout = 4000;
+    xhr.ontimeout = function(e) {
+        console.error(e);
+        if (savedToken) {
+            savedToken = null;
+        }
+
+    }
+    
+
+    xhr.send(JSON.stringify(body));
 }

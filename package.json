@@ -6,10 +6,7 @@
     "pebble-app"
   ],
   "private": true,
-  "dependencies": {
-    "message-queue-pebble": "^1.0.0",
-    "pebble-clay": "^1.0.4"
-  },
+  "dependencies": {},
   "pebble": {
     "displayName": "ThermoSetterREST",
     "uuid": "57b165cc-1b61-4955-a6a4-4de6960bae45",

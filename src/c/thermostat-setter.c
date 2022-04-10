@@ -5,7 +5,7 @@
 
 // Data associated with a thermostat
 struct thermostat {
-  char id[20];
+  char id[64];
   char name[50];
   char temperature[6];
 };
@@ -37,40 +37,29 @@ static void update_ui(void){
   text_layer_set_text(namelayer, thermostats[selected_thermostat].name);
 }
 
-// The keys for the messages send from/to the phone. Corresponds to the
-// AppKeys in appinfo.json
-enum {
-  TEMPERATURE_CHANGE_KEY,
-  THERMOSTAT_INDEX_KEY,
-  THERMOSTAT_ID_KEY,
-  THERMOSTAT_NAME_KEY,
-  THERMOSTAT_TEMPERATURE_KEY
-};
-
 // Process the message received in the watch from the phone
 // Updates the array of thermostats with the received data
 static void receive_message(DictionaryIterator *iter, void *context) {
   Tuple *thermostat_id_tuple;
   Tuple *thermostat_name_tuple;
   Tuple *thermostat_temperature_tuple;
-  Tuple *thermostat_index_tuple = dict_find(iter, THERMOSTAT_INDEX_KEY);
+  Tuple *thermostat_index_tuple = dict_find(iter, MESSAGE_KEY_thermostatIndex);
   int i;
 
   if (thermostat_index_tuple){
     i = thermostat_index_tuple->value->uint8;
     if (i < MAX_THERMOSTATS){ // Make sure the array does not overflow
-
-      thermostat_id_tuple = dict_find(iter, THERMOSTAT_ID_KEY);
+      thermostat_id_tuple = dict_find(iter, MESSAGE_KEY_thermostatId);
       if (thermostat_id_tuple){
         strcpy(thermostats[i].id, thermostat_id_tuple->value->cstring);
       }
 
-      thermostat_name_tuple = dict_find(iter, THERMOSTAT_NAME_KEY);
+      thermostat_name_tuple = dict_find(iter, MESSAGE_KEY_thermostatName);
       if (thermostat_name_tuple){
         strcpy(thermostats[i].name, thermostat_name_tuple->value->cstring);
       }
 
-      thermostat_temperature_tuple = dict_find(iter, THERMOSTAT_TEMPERATURE_KEY);
+      thermostat_temperature_tuple = dict_find(iter, MESSAGE_KEY_thermostatTemperature);
       if (thermostat_temperature_tuple) {
         strcpy(thermostats[i].temperature,
           thermostat_temperature_tuple->value->cstring);
@@ -92,15 +81,15 @@ static void send_message(int temperature_change) {
   }
 
   Tuplet thermostat_id_tuple =
-    TupletCString(THERMOSTAT_ID_KEY, thermostats[selected_thermostat].id);
+    TupletCString(MESSAGE_KEY_thermostatId, thermostats[selected_thermostat].id);
   dict_write_tuplet(iter, &thermostat_id_tuple);
 
   Tuplet thermostat_index_tuple =
-    TupletInteger(THERMOSTAT_INDEX_KEY, selected_thermostat);
+    TupletInteger(MESSAGE_KEY_thermostatIndex, selected_thermostat);
   dict_write_tuplet(iter, &thermostat_index_tuple);
 
   Tuplet temperature_change_tuple =
-    TupletInteger(TEMPERATURE_CHANGE_KEY, temperature_change);
+    TupletInteger(MESSAGE_KEY_thermostatTemperature, temperature_change);
   dict_write_tuplet(iter, &temperature_change_tuple);
 
   dict_write_end(iter);

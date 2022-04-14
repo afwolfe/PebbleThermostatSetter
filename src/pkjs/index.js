@@ -8,12 +8,17 @@ var Promise = require('bluebird');
 
 const config = require("./config.js");
 
+// Command Enums
+const COMMAND_TEMP_CHANGE = 0;
+const COMMAND_MODE_CHANGE = 1;
+
 const DEBUG = 0;
 
 var baseUrl,
     savedToken,
     thermostats,
-    endpoints;
+    endpoints,
+    modes;
 
 
 // Called as soon as application is ready. It initializes data.
@@ -21,6 +26,7 @@ Pebble.addEventListener("ready", function(e) {
     baseUrl = config.baseUrl;
     thermostats = config.thermostats;
     endpoints = config.endpoints;
+    modes = config.modes;
 
     if (DEBUG > 0) { console.log("Initializing thermostat data ..."); }
     initializeThermostatData();
@@ -29,34 +35,34 @@ Pebble.addEventListener("ready", function(e) {
 // Receives a message from the watch with data to change temperature
 Pebble.addEventListener("appmessage", function(e) {
     var msg = e.payload;
-    if (msg.hasOwnProperty("temperatureChange") && msg.hasOwnProperty("thermostatIndex")) {
-        var temperatureChange = parseInt(msg.temperatureChange),
-            thermostatIndex = parseInt(msg.thermostatIndex);
-
-        changeTemperature(temperatureChange, thermostatIndex);
+    if (msg.hasOwnProperty("command")) {
+        if (msg.command == COMMAND_TEMP_CHANGE && msg.hasOwnProperty("temperatureChange") && msg.hasOwnProperty("thermostatIndex")) {
+            var temperatureChange = parseInt(msg.temperatureChange),
+                thermostatIndex = parseInt(msg.thermostatIndex);
+    
+            changeTemperature(thermostatIndex, temperatureChange);
+        }
+        else if (msg.command == COMMAND_MODE_CHANGE && msg.hasOwnProperty("thermostatIndex")) {
+            var thermostatIndex = parseInt(msg.thermostatIndex);
+            changeMode(thermostatIndex);
+        }
     }
-    else {
-        if (DEBUG > 0) { console.error("missing message keys"); }
-    }
+    else if (DEBUG > 0) { console.error("Command key not found"); }
 });
 
 // Changes the temperature of a thermostat adding temperatureChange to
 // its current temperature. Returns error in case of failure.
-function changeTemperature(temperatureChange, thermostatIndex){
-
-    if (DEBUG > 0) { console.log("Requesting temperature change: " + temperatureChange + ", for thermostat: " + thermostatIndex); };
+function changeTemperature(thermostatIndex, temperatureChange){
+    if (DEBUG > 0) { console.log("Requesting temperature change: " + temperatureChange + ", for thermostat: " + thermostatIndex); }
     
     var thermostatId = thermostats[thermostatIndex].id;
-
     loginIfNecessary().then(
         function(){ // resolve loginIfNecessary
-            var currentTemperature, thermostatData, newTemperature;
+            var thermostatData = {"thermostatIndex": thermostatIndex};
             
             getTemperature(thermostatId).then(
                 function(data) { // resolve getTemperature
-                    currentTemperature = data.temperature;
-                    thermostatData = {"thermostatIndex": thermostatIndex};
-                    newTemperature = currentTemperature + (temperatureChange / 1.8);
+                    var newTemperature = data.temperature + (temperatureChange / 1.8);
                     
                     setTemperature(thermostatId, newTemperature).then(
                         function(data) { // resolve setTemperature
@@ -79,12 +85,54 @@ function changeTemperature(temperatureChange, thermostatIndex){
     });
 }
 
-function sendThermostatData(thermostatData) {
-    Pebble.sendAppMessage({
-        "thermostatIndex": thermostatData.thermostatIndex,
-        "thermostatName": thermostatData.thermostatName,
-        "thermostatTemperature": thermostatData.thermostatTemperature
+function changeMode(thermostatIndex){
+    if (DEBUG > 0) { console.log("Requesting mode change for thermostat: " + thermostatIndex); }
+    
+    var thermostatId = thermostats[thermostatIndex].id;
+    loginIfNecessary().then(
+        function(){ // resolve loginIfNecessary
+            var thermostatData = {"thermostatIndex": thermostatIndex};
+
+            getMode(thermostatId).then(
+                function(data) { // resolve
+                    var currentMode = parseInt(data.mode);
+                    var numModes = Object.keys(modes).length;
+                    var nextMode = (currentMode + 1) % numModes;
+                    setMode(thermostatId, nextMode).then(
+                        function(data) { // resolve
+                            thermostatData.thermostatMode = modes[nextMode];
+                        },
+                        function(data) { // reject
+                            if (DEBUG > 0) { console.error("Error setting mode."); }
+                            thermostatData.thermostatMode = currentMode;
+                            thermostatData.thermostatName = "Error";
+                        }
+                    )
+                },
+                function(data) { // reject
+                    if (DEBUG > 0) { console.error("Error getting mode."); }
+                    thermostatData.thermostatName = "Error";
+                }
+            ).finally(
+                function() {
+                    sendThermostatData(thermostatData);
+                }
+            )
     });
+}
+
+// sends thermostat data to the Pebble
+function sendThermostatData(thermostatData) {
+    if (thermostatData.hasOwnProperty("thermostatIndex")) {
+        if (!thermostatData.hasOwnProperty("thermostatName")) {
+            // If name isn't specified (previous error)
+            thermostatData["thermostatName"] = thermostats[thermostatData.thermostatIndex].name;
+        }
+        if (thermostatData.hasOwnProperty("thermostatId")) { // Never send ID
+            delete thermostatData.thermostatId;
+        }
+        Pebble.sendAppMessage(thermostatData);
+    }
 }
 
 // Gets the temperature of a thermostat
@@ -102,14 +150,49 @@ function getTemperature(thermostatId) {
         xhrPromise(options).then(
             function(data) { // resolve
                 try {
-                    temperature = extractVariable(data, endpoint.value);
+                    var temperature = extractVariable(data, endpoint.value);
                     if (DEBUG > 0) { console.log("Thermostat " + thermostatId + " current temperature: " + temperature); }
                     return resolve({"temperature": temperature});
                 }
                 catch (e){
                     if (DEBUG > 0) {
                         console.error('Unable to get current temperature for thermostat '
-                            + thermostatId + ". Error: " + e);
+                            + thermostatId + ".\nError: " + e);
+                        console.log("Response text: " + data);
+                    }
+                    return reject({"status" : 400});
+                }
+            },
+            function(data) { // reject
+                return reject(data);
+        });
+    });
+}
+
+
+// Gets the temperature of a thermostat
+// Resolve returns the temperature
+// Reject returns a status code
+function getMode(thermostatId) {
+    var endpoint = prepareToCallEndpoint("getMode", thermostatId);
+
+    var options = {
+        url: baseUrl + endpoint.url,
+        method: endpoint.method,
+        headers: endpoint.headers
+    };
+    return new Promise(function(resolve, reject) {
+        xhrPromise(options).then(
+            function(data) { // resolve
+                try {
+                    var mode = extractVariable(data, endpoint.value);
+                    if (DEBUG > 0) { console.log("Thermostat " + thermostatId + " current mode: " + modes[mode]); }
+                    return resolve({"mode": mode});
+                }
+                catch (e){
+                    if (DEBUG > 0) {
+                        console.error('Unable to get current mode for thermostat '
+                            + thermostatId + ".\nError: " + e);
                         console.log("Response text: " + data);
                     }
                     return reject({"status" : 400});
@@ -139,7 +222,34 @@ function setTemperature(thermostatId, temperature){
             },
             function(data) { // reject
                 if (DEBUG > 0) {
-                    console.error('Unable to set temperature for thermostat ' + thermostatId + ". Error: " + data.status);
+                    console.error('Unable to set temperature for thermostat ' + thermostatId + ".\nError: " + data.status);
+                }
+                return reject(data);
+            }
+        );
+    });
+}
+
+
+// Sets the temperature of a thermostat
+function setMode(thermostatId, mode){
+    var endpoint = prepareToCallEndpoint("setMode", thermostatId, mode);
+    var options = {
+        url: baseUrl + endpoint.url,
+        body: endpoint.body,
+        method: endpoint.method,
+        headers: endpoint.headers
+    };
+
+    return new Promise(function(resolve, reject) {
+        xhrPromise(options).then(
+            function(data) { // resolve
+                if (DEBUG > 0) { console.log("Mode updated!"); }
+                return resolve(data);
+            },
+            function(data) { // reject
+                if (DEBUG > 0) {
+                    console.error('Unable to set mode for thermostat ' + thermostatId + ".\nError: " + data.status);
                 }
                 return reject(data);
             }
@@ -214,19 +324,26 @@ function encodeTemperature(temperature){
 }
 
 // Substitutes the variables in the endpoint and returns the updated endpoint object.
-function prepareToCallEndpoint(endpointName, thermostatId, temperature) {
+function prepareToCallEndpoint(endpointName, thermostatId, bodyValue) {
     
     if (endpoints[endpointName]) {
         var tempEndpoint = endpoints[endpointName];
         // tempEndpoint.url = substituteVariable(tempEndpoint.url, thermostatId, temperature);
         // tempEndpoint.body = substituteVariable(tempEndpoint.body, thermostatId, temperature);
-        if (endpointName == "getTemperature" || endpointName == "setTemperature") {
+        if (endpointName == "getTemperature" || endpointName == "setTemperature" || endpointName == "getMode" || endpointName == "setMode") {
             tempEndpoint.url = "/api/accessories/" + thermostatId
         }
+
         if (endpointName == "setTemperature") {
             tempEndpoint.body = {
                 "characteristicType": "TargetTemperature",
-                "value": temperature
+                "value": bodyValue
+            }
+        }
+        else if (endpointName == "setMode") {
+            tempEndpoint.body = {
+                "characteristicType": "TargetHeatingCoolingState",
+                "value": bodyValue
             }
         }
         return tempEndpoint;
@@ -239,6 +356,7 @@ function substituteVariable(str, thermostatId, temperature) {
         // str = str.replaceAll("${ThermostatId}", thermostatId);
         str = str.replace("${ThermostatId}", thermostatId);
     }
+    // TODO: Update for mode/temperature.
     if (temperature) {
         // str = str.replaceAll("${TargetTemperature}", temperature);
         str = str.replace("${TargetTemperature}", temperature);

@@ -8,13 +8,19 @@
 struct thermostat {
   char name[50];
   char temperature[6];
+  char mode[10];
 };
 
 // Array that holds data for all thermostats
 struct thermostat thermostats[MAX_THERMOSTATS] = {
-  { "Loading ...", "0°"},
-  {"Loading ...", "0°"}
+  {"Loading ...", "0°", "OFF"},
+  {"Loading ...", "0°", "OFF"}
 };
+
+typedef enum {
+  TEMP_CHANGE,
+  MODE_CHANGE
+} Commands;
 
 // The currently selected thermostat
 static int selected_thermostat = 0;
@@ -35,6 +41,7 @@ static TextLayer *namelayer;
 static void update_ui(void){
   text_layer_set_text(temperaturelayer, thermostats[selected_thermostat].temperature);
   text_layer_set_text(namelayer, thermostats[selected_thermostat].name);
+  //TODO: Add mode to UI.
 }
 
 // Process the message received in the watch from the phone
@@ -42,6 +49,7 @@ static void update_ui(void){
 static void receive_message(DictionaryIterator *iter, void *context) {
   Tuple *thermostat_name_tuple;
   Tuple *thermostat_temperature_tuple;
+  Tuple *thermostat_mode_tuple;
   Tuple *thermostat_index_tuple = dict_find(iter, MESSAGE_KEY_thermostatIndex);
   int i;
 
@@ -56,8 +64,12 @@ static void receive_message(DictionaryIterator *iter, void *context) {
 
       thermostat_temperature_tuple = dict_find(iter, MESSAGE_KEY_thermostatTemperature);
       if (thermostat_temperature_tuple) {
-        strcpy(thermostats[i].temperature,
-          thermostat_temperature_tuple->value->cstring);
+        strcpy(thermostats[i].temperature, thermostat_temperature_tuple->value->cstring);
+      }
+
+      thermostat_mode_tuple = dict_find(iter, MESSAGE_KEY_thermostatMode);
+      if (thermostat_mode_tuple) {
+        strcpy(thermostats[i].mode, thermostat_mode_tuple->value->cstring);
       }
 
       update_ui();
@@ -66,7 +78,7 @@ static void receive_message(DictionaryIterator *iter, void *context) {
 }
 
 // Sends message from the watch to the phone
-static void send_message(int temperature_change) {
+static void send_temperature_message(int temperature_change) {
   DictionaryIterator *iter;
 
   app_message_outbox_begin(&iter);
@@ -74,6 +86,9 @@ static void send_message(int temperature_change) {
   if (iter == NULL) {
     return;
   }
+
+  Tuplet command_tuple = TupletInteger(MESSAGE_KEY_command, TEMP_CHANGE);
+  dict_write_tuplet(iter, &command_tuple);
 
   Tuplet thermostat_index_tuple =
     TupletInteger(MESSAGE_KEY_thermostatIndex, selected_thermostat);
@@ -88,25 +103,52 @@ static void send_message(int temperature_change) {
   app_message_outbox_send();
 }
 
+static void send_mode_message() {
+  DictionaryIterator *iter;
+
+  app_message_outbox_begin(&iter);
+
+  if (iter == NULL) {
+    return;
+  }
+
+  Tuplet command_tuple = TupletInteger(MESSAGE_KEY_command, MODE_CHANGE);
+  dict_write_tuplet(iter, &command_tuple);
+
+  Tuplet thermostat_index_tuple =
+    TupletInteger(MESSAGE_KEY_thermostatIndex, selected_thermostat);
+  dict_write_tuplet(iter, &thermostat_index_tuple);
+
+  dict_write_end(iter);
+  app_message_outbox_send();
+}
+
 static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
+  // Toggles the supported modes of the thermostat and updates the UI
+  send_mode_message();
+}
+
+static void select_long_click_handler(ClickRecognizerRef recognizer, void *context) {
+  // Changes the selected thermostat and updates the UI.
   selected_thermostat = (selected_thermostat + 1) % MAX_THERMOSTATS;
   update_ui();
 }
 
 static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
   text_layer_set_text(namelayer, "Raising ...");
-  send_message(1);
+  send_temperature_message(1);
 }
 
 static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
   text_layer_set_text(namelayer, "Lowering ...");
-  send_message(-1);
+  send_temperature_message(-1);
 }
 
 static void click_config_provider(void *context) {
   window_single_click_subscribe(BUTTON_ID_SELECT, select_click_handler);
   window_single_click_subscribe(BUTTON_ID_UP, up_click_handler);
   window_single_click_subscribe(BUTTON_ID_DOWN, down_click_handler);
+  window_long_click_subscribe(BUTTON_ID_SELECT, 500, select_long_click_handler, NULL);
 }
 
 static void initialize_ui(void) {

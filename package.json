@@ -24,9 +24,11 @@
       "watchface": false
     },
     "messageKeys": [
+      "command",
       "temperatureChange",
       "thermostatIndex",
       "thermostatId",
+      "thermostatMode",
       "thermostatName",
       "thermostatTemperature"
     ],

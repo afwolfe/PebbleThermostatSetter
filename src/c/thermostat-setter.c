@@ -52,7 +52,6 @@ static void receive_message(DictionaryIterator *iter, void *context) {
       thermostat_name_tuple = dict_find(iter, MESSAGE_KEY_thermostatName);
       if (thermostat_name_tuple){
         strcpy(thermostats[i].name, thermostat_name_tuple->value->cstring);
-        LOG(thermostats[i].name);
       }
 
       thermostat_temperature_tuple = dict_find(iter, MESSAGE_KEY_thermostatTemperature);

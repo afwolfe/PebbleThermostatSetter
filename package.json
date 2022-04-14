@@ -6,7 +6,9 @@
     "pebble-app"
   ],
   "private": true,
-  "dependencies": {},
+  "dependencies": {
+    "bluebird": "^3.7.2"
+  },
   "pebble": {
     "displayName": "ThermoSetterREST",
     "uuid": "57b165cc-1b61-4955-a6a4-4de6960bae45",

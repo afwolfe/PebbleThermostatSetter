@@ -183,25 +183,25 @@ static void initialize_ui(void) {
   layer_add_child(window_get_root_layer(s_window), (Layer *)bitmap_layer);
   
   // temperature_layer
-  temperature_layer = text_layer_create(GRect(35, 16, 78, 42));
-  text_layer_set_background_color(temperature_layer, GColorBlack);
+  temperature_layer = text_layer_create(GRect(35, 15, 80, 45));
+  text_layer_set_background_color(temperature_layer, GColorClear);
   text_layer_set_text_color(temperature_layer, GColorWhite);
   text_layer_set_text_alignment(temperature_layer, GTextAlignmentRight);
   text_layer_set_font(temperature_layer, s_res_temperature_font);
   layer_add_child(window_get_root_layer(s_window), (Layer *)temperature_layer);
   
   // name_layer
-  name_layer = text_layer_create(GRect(8, 93, 100, 56));
-  text_layer_set_background_color(name_layer, GColorBlack);
+  name_layer = text_layer_create(GRect(10, 95, 100, 55));
+  text_layer_set_background_color(name_layer, GColorClear);
   text_layer_set_text_color(name_layer, GColorWhite);
   text_layer_set_font(name_layer, s_res_name_font);
   layer_add_child(window_get_root_layer(s_window), (Layer *)name_layer);
 
   // mode_layer
-  mode_layer = text_layer_create(GRect(35, 5, 50, 10));
+  mode_layer = text_layer_create(GRect(35, 5, 50, 20));
   text_layer_set_background_color(mode_layer, GColorClear);
   text_layer_set_text_color(mode_layer, GColorWhite);
-  text_layer_set_font(mode_layer, s_res_name_font);
+  text_layer_set_font(mode_layer, s_res_mode_font);
   layer_add_child(window_get_root_layer(s_window), (Layer *)mode_layer);
 
   update_ui();

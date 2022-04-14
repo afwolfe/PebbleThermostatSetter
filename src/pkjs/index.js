@@ -56,32 +56,28 @@ function changeTemperature(thermostatIndex, temperatureChange){
     if (DEBUG > 0) { console.log("Requesting temperature change: " + temperatureChange + ", for thermostat: " + thermostatIndex); }
     
     var thermostatId = thermostats[thermostatIndex].id;
-    loginIfNecessary().then(
-        function(){ // resolve loginIfNecessary
-            var thermostatData = {"thermostatIndex": thermostatIndex};
+    loginIfNecessary().then(function(){
+        var thermostatData = {"thermostatIndex": thermostatIndex};
+        
+        getTemperature(thermostatId).then(function(data) {
+            var newTemperature = data.temperature + (temperatureChange / 1.8);
             
-            getTemperature(thermostatId).then(
-                function(data) { // resolve getTemperature
-                    var newTemperature = data.temperature + (temperatureChange / 1.8);
-                    
-                    setTemperature(thermostatId, newTemperature).then(
-                        function(data) { // resolve setTemperature
-                            thermostatData.thermostatTemperature = encodeTemperature(newTemperature);
-                        },
-                        function(data) { // reject setTemperature
-                            if (DEBUG > 0) { console.error("Error setting temperature."); }
-                            thermostatData.thermostatName = "Error";
-                        }
-                    );
-                },
-                function(data) { // reject getTemperature
-                    if (DEBUG > 0) { console.error("Error getting temperature."); }
-                    thermostatData.thermostatName = "Error";
-            }).finally( // finally getTemperature
-                function() {
-                    sendThermostatData(thermostatData);
-                }
-            );
+            setTemperature(thermostatId, newTemperature).then(function(data) {
+                thermostatData.thermostatTemperature = encodeTemperature(newTemperature);
+            })
+            .catch(function(data) {
+                if (DEBUG > 0) { console.error("Error setting temperature."); }
+                thermostatData.thermostatName = "Error";
+            })
+            .finally(function() {
+                sendThermostatData(thermostatData);
+            });
+        })
+        .catch(function(data) { // reject getTemperature
+            if (DEBUG > 0) { console.error("Error getting temperature."); }
+            thermostatData.thermostatName = "Error";
+            sendThermostatData(thermostatData);
+        });
     });
 }
 
@@ -89,41 +85,39 @@ function changeMode(thermostatIndex){
     if (DEBUG > 0) { console.log("Requesting mode change for thermostat: " + thermostatIndex); }
     
     var thermostatId = thermostats[thermostatIndex].id;
-    loginIfNecessary().then(
-        function(){ // resolve loginIfNecessary
-            var thermostatData = {"thermostatIndex": thermostatIndex};
+    loginIfNecessary().then(function(){
+        var thermostatData = {"thermostatIndex": thermostatIndex};
 
-            getMode(thermostatId).then(
-                function(data) { // resolve
-                    var currentMode = parseInt(data.mode);
-                    var numModes = Object.keys(modes).length;
-                    var nextMode = (currentMode + 1) % numModes;
-                    setMode(thermostatId, nextMode).then(
-                        function(data) { // resolve
-                            thermostatData.thermostatMode = modes[nextMode];
-                        },
-                        function(data) { // reject
-                            if (DEBUG > 0) { console.error("Error setting mode."); }
-                            thermostatData.thermostatMode = currentMode;
-                            thermostatData.thermostatName = "Error";
-                        }
-                    )
-                },
-                function(data) { // reject
-                    if (DEBUG > 0) { console.error("Error getting mode."); }
-                    thermostatData.thermostatName = "Error";
-                }
-            ).finally(
-                function() {
-                    sendThermostatData(thermostatData);
-                }
-            )
+        getMode(thermostatId).then(function(data) {
+            var currentMode = parseInt(data.mode);
+            var numModes = Object.keys(modes).length;
+            var nextMode = (currentMode + 1) % numModes;
+            setMode(thermostatId, nextMode).then(function(data) { 
+                thermostatData.thermostatMode = modes[nextMode];
+                return thermostatData;
+            })
+            .catch(function(data) {
+                if (DEBUG > 0) { console.error("Error setting mode."); }
+                thermostatData.thermostatMode = modes[currentMode];
+                thermostatData.thermostatName = "Error";
+                return thermostatData
+            })
+            .finally(function() {
+                sendThermostatData(thermostatData);
+            });
+        })
+        .catch(function(data) {
+            if (DEBUG > 0) { console.error("Error getting mode."); }
+            thermostatData.thermostatName = "Error";
+            sendThermostatData(thermostatData);
+        });
     });
 }
 
 // sends thermostat data to the Pebble
 function sendThermostatData(thermostatData) {
     if (thermostatData.hasOwnProperty("thermostatIndex")) {
+        if (DEBUG > 1) { console.log("Sending data to Pebble."); }
         if (!thermostatData.hasOwnProperty("thermostatName")) {
             // If name isn't specified (previous error)
             thermostatData["thermostatName"] = thermostats[thermostatData.thermostatIndex].name;

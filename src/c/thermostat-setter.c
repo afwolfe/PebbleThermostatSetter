@@ -32,15 +32,18 @@ static GBitmap *s_res_down;
 static GBitmap *s_res_thermometer;
 static GFont s_res_temperature_font;
 static GFont s_res_name_font;
-static ActionBarLayer *actionbarlayer;
-static BitmapLayer *bitmaplayer;
-static TextLayer *temperaturelayer;
-static TextLayer *namelayer;
+static GFont s_res_mode_font;
+static ActionBarLayer *action_bar_layer;
+static BitmapLayer *bitmap_layer;
+static TextLayer *temperature_layer;
+static TextLayer *name_layer;
+static TextLayer *mode_layer;
 
 // Updates the UI with current data from the array of thermostats
 static void update_ui(void){
-  text_layer_set_text(temperaturelayer, thermostats[selected_thermostat].temperature);
-  text_layer_set_text(namelayer, thermostats[selected_thermostat].name);
+  text_layer_set_text(temperature_layer, thermostats[selected_thermostat].temperature);
+  text_layer_set_text(name_layer, thermostats[selected_thermostat].name);
+  text_layer_set_text(mode_layer, thermostats[selected_thermostat].mode);
   //TODO: Add mode to UI.
 }
 
@@ -135,12 +138,12 @@ static void select_long_click_handler(ClickRecognizerRef recognizer, void *conte
 }
 
 static void up_click_handler(ClickRecognizerRef recognizer, void *context) {
-  text_layer_set_text(namelayer, "Raising ...");
+  text_layer_set_text(name_layer, "Raising ...");
   send_temperature_message(1);
 }
 
 static void down_click_handler(ClickRecognizerRef recognizer, void *context) {
-  text_layer_set_text(namelayer, "Lowering ...");
+  text_layer_set_text(name_layer, "Lowering ...");
   send_temperature_message(-1);
 }
 
@@ -162,46 +165,54 @@ static void initialize_ui(void) {
   s_res_thermometer = gbitmap_create_with_resource(RESOURCE_ID_THERMOMETER);
   s_res_temperature_font = fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
   s_res_name_font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
+  s_res_mode_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
+  
+  // action_bar_layer
+  action_bar_layer = action_bar_layer_create();
+  action_bar_layer_add_to_window(action_bar_layer, s_window);
+  action_bar_layer_set_background_color(action_bar_layer, GColorWhite);
+  action_bar_layer_set_icon(action_bar_layer, BUTTON_ID_UP, s_res_up);
+  action_bar_layer_set_icon(action_bar_layer, BUTTON_ID_SELECT, s_res_selector);
+  action_bar_layer_set_icon(action_bar_layer, BUTTON_ID_DOWN, s_res_down);
+  action_bar_layer_set_click_config_provider(action_bar_layer, click_config_provider);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)action_bar_layer);
+  
+  // bitmap_layer
+  bitmap_layer = bitmap_layer_create(GRect(0, 0, 41, 94));
+  bitmap_layer_set_bitmap(bitmap_layer, s_res_thermometer);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)bitmap_layer);
+  
+  // temperature_layer
+  temperature_layer = text_layer_create(GRect(35, 16, 78, 42));
+  text_layer_set_background_color(temperature_layer, GColorBlack);
+  text_layer_set_text_color(temperature_layer, GColorWhite);
+  text_layer_set_text_alignment(temperature_layer, GTextAlignmentRight);
+  text_layer_set_font(temperature_layer, s_res_temperature_font);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)temperature_layer);
+  
+  // name_layer
+  name_layer = text_layer_create(GRect(8, 93, 100, 56));
+  text_layer_set_background_color(name_layer, GColorBlack);
+  text_layer_set_text_color(name_layer, GColorWhite);
+  text_layer_set_font(name_layer, s_res_name_font);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)name_layer);
 
-  // actionbarlayer
-  actionbarlayer = action_bar_layer_create();
-  action_bar_layer_add_to_window(actionbarlayer, s_window);
-  action_bar_layer_set_background_color(actionbarlayer, GColorWhite);
-  action_bar_layer_set_icon(actionbarlayer, BUTTON_ID_UP, s_res_up);
-  action_bar_layer_set_icon(actionbarlayer, BUTTON_ID_SELECT, s_res_selector);
-  action_bar_layer_set_icon(actionbarlayer, BUTTON_ID_DOWN, s_res_down);
-  action_bar_layer_set_click_config_provider(actionbarlayer, click_config_provider);
-  layer_add_child(window_get_root_layer(s_window), (Layer *)actionbarlayer);
-  
-  // bitmaplayer
-  bitmaplayer = bitmap_layer_create(GRect(5, 0, 41, 94));
-  bitmap_layer_set_bitmap(bitmaplayer, s_res_thermometer);
-  layer_add_child(window_get_root_layer(s_window), (Layer *)bitmaplayer);
-  
-  // temperaturelayer
-  temperaturelayer = text_layer_create(GRect(40, 16, 78, 42));
-  text_layer_set_background_color(temperaturelayer, GColorBlack);
-  text_layer_set_text_color(temperaturelayer, GColorWhite);
-  text_layer_set_text_alignment(temperaturelayer, GTextAlignmentRight);
-  text_layer_set_font(temperaturelayer, s_res_temperature_font);
-  layer_add_child(window_get_root_layer(s_window), (Layer *)temperaturelayer);
-  
-  // namelayer
-  namelayer = text_layer_create(GRect(8, 93, 100, 56));
-  text_layer_set_background_color(namelayer, GColorBlack);
-  text_layer_set_text_color(namelayer, GColorWhite);
-  text_layer_set_font(namelayer, s_res_name_font);
-  layer_add_child(window_get_root_layer(s_window), (Layer *)namelayer);
+  // mode_layer
+  mode_layer = text_layer_create(GRect(35, 5, 50, 10));
+  text_layer_set_background_color(mode_layer, GColorClear);
+  text_layer_set_text_color(mode_layer, GColorWhite);
+  text_layer_set_font(mode_layer, s_res_name_font);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)mode_layer);
 
   update_ui();
 }
 
 static void destroy_ui(void) {
   window_destroy(s_window);
-  action_bar_layer_destroy(actionbarlayer);
-  bitmap_layer_destroy(bitmaplayer);
-  text_layer_destroy(temperaturelayer);
-  text_layer_destroy(namelayer);
+  action_bar_layer_destroy(action_bar_layer);
+  bitmap_layer_destroy(bitmap_layer);
+  text_layer_destroy(temperature_layer);
+  text_layer_destroy(name_layer);
   gbitmap_destroy(s_res_up);
   gbitmap_destroy(s_res_selector);
   gbitmap_destroy(s_res_down);

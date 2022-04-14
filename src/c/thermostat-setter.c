@@ -44,7 +44,6 @@ static void update_ui(void){
   text_layer_set_text(temperature_layer, thermostats[selected_thermostat].temperature);
   text_layer_set_text(name_layer, thermostats[selected_thermostat].name);
   text_layer_set_text(mode_layer, thermostats[selected_thermostat].mode);
-  //TODO: Add mode to UI.
 }
 
 // Process the message received in the watch from the phone
@@ -163,10 +162,10 @@ static void initialize_ui(void) {
   s_res_selector = gbitmap_create_with_resource(RESOURCE_ID_SELECTOR);
   s_res_down = gbitmap_create_with_resource(RESOURCE_ID_DOWN);
   s_res_thermometer = gbitmap_create_with_resource(RESOURCE_ID_THERMOMETER);
-  s_res_temperature_font = fonts_get_system_font(FONT_KEY_BITHAM_42_LIGHT);
+  s_res_temperature_font = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
   s_res_name_font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
   s_res_mode_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
-  
+
   // action_bar_layer
   action_bar_layer = action_bar_layer_create();
   action_bar_layer_add_to_window(action_bar_layer, s_window);
@@ -177,13 +176,17 @@ static void initialize_ui(void) {
   action_bar_layer_set_click_config_provider(action_bar_layer, click_config_provider);
   layer_add_child(window_get_root_layer(s_window), (Layer *)action_bar_layer);
   
+
+  int DISPLAY_WIDTH = PEBBLE_WIDTH - ACTION_BAR_WIDTH;
+
+
   // bitmap_layer
   bitmap_layer = bitmap_layer_create(GRect(0, 0, 41, 94));
   bitmap_layer_set_bitmap(bitmap_layer, s_res_thermometer);
   layer_add_child(window_get_root_layer(s_window), (Layer *)bitmap_layer);
   
   // temperature_layer
-  temperature_layer = text_layer_create(GRect(35, 15, 80, 45));
+  temperature_layer = text_layer_create(GRect(0, 15, DISPLAY_WIDTH-2, 45));
   text_layer_set_background_color(temperature_layer, GColorClear);
   text_layer_set_text_color(temperature_layer, GColorWhite);
   text_layer_set_text_alignment(temperature_layer, GTextAlignmentRight);
@@ -191,16 +194,17 @@ static void initialize_ui(void) {
   layer_add_child(window_get_root_layer(s_window), (Layer *)temperature_layer);
   
   // name_layer
-  name_layer = text_layer_create(GRect(10, 95, 100, 55));
+  name_layer = text_layer_create(GRect(2, PEBBLE_HEIGHT-60, DISPLAY_WIDTH-2, 60));
   text_layer_set_background_color(name_layer, GColorClear);
   text_layer_set_text_color(name_layer, GColorWhite);
   text_layer_set_font(name_layer, s_res_name_font);
   layer_add_child(window_get_root_layer(s_window), (Layer *)name_layer);
 
   // mode_layer
-  mode_layer = text_layer_create(GRect(35, 5, 50, 20));
+  mode_layer = text_layer_create(GRect(0, 0, DISPLAY_WIDTH-2, 20));
   text_layer_set_background_color(mode_layer, GColorClear);
   text_layer_set_text_color(mode_layer, GColorWhite);
+  text_layer_set_text_alignment(mode_layer, GTextAlignmentRight);
   text_layer_set_font(mode_layer, s_res_mode_font);
   layer_add_child(window_get_root_layer(s_window), (Layer *)mode_layer);
 

@@ -3,7 +3,8 @@
 
 // const clayConfig = require('./config.json');
 // const clay = new Clay(clayConfig);
-var Promise = require('bluebird');
+const MessageQueue = require('message-queue-pebble');
+const Promise = require('bluebird');
 // require('./polyfills/string');
 
 const config = require("./config.js");
@@ -63,11 +64,11 @@ function changeTemperature(thermostatIndex, temperatureChange){
             var newTemperature,
                 currentMode,
                 characteristicType;
-            if (data.hasOwnProperty(config.values.CurrentTemperature)) {
-                newTemperature = data[config.values.CurrentTemperature] + (temperatureChange * 1.8);
+            if (data.hasOwnProperty(config.values.TargetTemperature)) {
+                newTemperature = data[config.values.TargetTemperature] + (temperatureChange / 1.8);
             }
-            if (data.hasOwnProperty(config.values.CurrentHeatingCoolingState)) {
-                currentMode = data[config.values.CurrentHeatingCoolingState];
+            if (data.hasOwnProperty(config.values.TargetHeatingCoolingState)) {
+                currentMode = parseInt(data[config.values.TargetHeatingCoolingState]);
                 if (config.modes.hasOwnProperty(currentMode)) {
                     var modeName = config.modes[currentMode];
                     switch (modeName) {
@@ -99,7 +100,7 @@ function changeTemperature(thermostatIndex, temperatureChange){
                         });
                     }
                     else {
-                        if (DEBUG > 0) { console.error("Mode not found: " + currentMode); }
+                        if (DEBUG > 0) { console.error("Mode could not be mapped: " + modeName); }
                     }
 
                 } else {
@@ -107,7 +108,7 @@ function changeTemperature(thermostatIndex, temperatureChange){
                 }
             }
             else {
-                if (DEBUG > 0) { console.error("CurrentHeatingCoolingState not found in response."); }
+                if (DEBUG > 0) { console.error("TargetHeatingCoolingState not found in response."); }
             }
         })
         .catch(function(data) { // reject getTemperature
@@ -126,8 +127,8 @@ function changeMode(thermostatIndex){
         var thermostatData = {"thermostatIndex": thermostatIndex};
 
         getThermostatValues(thermostatId).then(function(data) {
-            if (data.hasOwnProperty(config.values.CurrentHeatingCoolingState)) {
-                currentMode = parseInt(data[config.values.CurrentHeatingCoolingState]);
+            if (data.hasOwnProperty(config.values.TargetHeatingCoolingState)) {
+                currentMode = parseInt(data[config.values.TargetHeatingCoolingState]);
                 var numModes = Object.keys(modes).length;
                 var nextMode = (currentMode + 1) % numModes;
                 setMode(thermostatId, nextMode).then(function(data) { 
@@ -167,7 +168,7 @@ function sendThermostatData(thermostatData) {
         if (thermostatData.hasOwnProperty("thermostatId")) { // Never send ID
             delete thermostatData.thermostatId;
         }
-        Pebble.sendAppMessage(thermostatData);
+        MessageQueue.sendAppMessage(thermostatData);
     }
 }
 
@@ -241,6 +242,7 @@ function setTemperature(thermostatId, characteristicType, value){
 
 // Sets the temperature of a thermostat
 function setMode(thermostatId, mode){
+    if (DEBUG > 2) { console.log("Setting mode for thermostatId: " + thermostatId + ", Mode: " + mode); }
     var endpoint = prepareToCallEndpoint("setMode", thermostatId, config.values.TargetHeatingCoolingState, mode);
     var options = {
         url: baseUrl + endpoint.url,
@@ -316,8 +318,8 @@ function initializeThermostatData(){
                             var targetTemperature = data[config.values.TargetTemperature];
                             thermostatData["thermostatTemperature"] = encodeTemperature(targetTemperature);
                         }
-                        if (data.hasOwnProperty(config.values.CurrentTemperature)) {
-                            var currentTemperature = data[config.values.CurrentTemperature];
+                        if (data.hasOwnProperty(config.values.TargetTemperature)) {
+                            var currentTemperature = data[config.values.TargetTemperature];
                             thermostatData["currentTemperature"] = encodeTemperature(currentTemperature);
                         }
                         sendThermostatData(thermostatData);
@@ -349,7 +351,7 @@ function prepareToCallEndpoint(endpointName, thermostatId, characteristicType, b
             tempEndpoint.url = "/api/accessories/" + thermostatId;
         }
 
-        if (characteristicType && bodyValue) {
+        if (characteristicType != null && bodyValue != null) {
             tempEndpoint.body = {
                 "characteristicType": characteristicType,
                 "value": bodyValue

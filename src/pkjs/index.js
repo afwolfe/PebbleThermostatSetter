@@ -13,7 +13,7 @@ const config = require("./config.js");
 const COMMAND_TEMP_CHANGE = 0;
 const COMMAND_MODE_CHANGE = 1;
 
-const DEBUG = 3;
+const DEBUG = 0;
 
 var baseUrl,
     savedToken,
@@ -67,7 +67,11 @@ function changeTemperature(thermostatIndex, temperatureChange){
             if (data.hasOwnProperty(config.values.TargetTemperature)) {
                 newTemperature = data[config.values.TargetTemperature] + (temperatureChange / 1.8);
             }
+            if (data.hasOwnProperty(config.values.CurrentTemperature)) {
+                thermostatData.currentTemperature = encodeTemperature(data[config.values.CurrentTemperature]);
+            }
             if (data.hasOwnProperty(config.values.TargetHeatingCoolingState)) {
+                thermostatData.thermostatMode = modes[data[config.values.TargetHeatingCoolingState]];
                 currentMode = parseInt(data[config.values.TargetHeatingCoolingState]);
                 if (config.modes.hasOwnProperty(currentMode)) {
                     var modeName = config.modes[currentMode];
@@ -87,7 +91,7 @@ function changeTemperature(thermostatIndex, temperatureChange){
 
                     if (characteristicType) {
                         setTemperature(thermostatId, characteristicType, newTemperature).then(function(data) {
-                            thermostatData.thermostatTemperature = encodeTemperature(newTemperature);
+                            thermostatData.targetTemperature = encodeTemperature(newTemperature);
                             return thermostatData;
                         })
                         .catch(function(data) {
@@ -310,23 +314,25 @@ function initializeThermostatData(){
                     "thermostatId": thermostats[i].id,
                     "thermostatName": thermostats[i].name,
                 };
-
-                getThermostatValues(thermostatData["thermostatId"]).then(
-                    function(data) {
-                        if (DEBUG > 1) { console.log("Sending thermostat to Pebble"); }
-                        if (data.hasOwnProperty(config.values.TargetTemperature)) {
-                            var targetTemperature = data[config.values.TargetTemperature];
-                            thermostatData["thermostatTemperature"] = encodeTemperature(targetTemperature);
-                        }
-                        if (data.hasOwnProperty(config.values.TargetTemperature)) {
-                            var currentTemperature = data[config.values.TargetTemperature];
-                            thermostatData["currentTemperature"] = encodeTemperature(currentTemperature);
-                        }
-                        sendThermostatData(thermostatData);
-                    })
-                    .catch(function(data) {
-                        if (DEBUG > 0) { console.error("Error getting thermostat information for " + thermostatData["thermostatId"]); }
-                    });
+                setTimeout(function(thermostatData) {
+                    getThermostatValues(thermostatData["thermostatId"]).then(
+                        function(data) {
+                            if (DEBUG > 1) { console.log("Sending thermostat to Pebble"); }
+                            if (data.hasOwnProperty(config.values.TargetTemperature)) {
+                                thermostatData.targetTemperature = encodeTemperature(data[config.values.TargetTemperature]);
+                            }
+                            if (data.hasOwnProperty(config.values.CurrentTemperature)) {
+                                thermostatData.currentTemperature = encodeTemperature(data[config.values.CurrentTemperature]);
+                            }
+                            if (data.hasOwnProperty(config.values.TargetHeatingCoolingState)) {
+                                thermostatData.thermostatMode = modes[data[config.values.TargetHeatingCoolingState]];
+                            }
+                            sendThermostatData(thermostatData);
+                        })
+                        .catch(function(data) {
+                            if (DEBUG > 0) { console.error("Error getting thermostat information for " + thermostatData["thermostatId"]); }
+                        });
+                }.bind(null,thermostatData), 1000);
             }
         }
         else {
@@ -432,7 +438,7 @@ function xhrPromise(options) {
 
         xhr.addEventListener("readystatechange", function () {
             if (xhr.readyState === 4) {
-                if (DEBUG > 2) { console.debug(method, url, xhr.status); }
+                if (DEBUG > 2) { console.log(method, url, xhr.status); }
                 var data;
                 if (xhr.status >= 200 && xhr.status < 300) {
                     if (xhr.responseText) {

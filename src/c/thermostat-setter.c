@@ -7,14 +7,15 @@
 // Data associated with a thermostat
 struct thermostat {
   char name[50];
-  char temperature[6];
+  char currentTemperature[6];
+  char targetTemperature[6];
   char mode[10];
 };
 
 // Array that holds data for all thermostats
 struct thermostat thermostats[MAX_THERMOSTATS] = {
-  {"Loading ...", "0°", "OFF"},
-  {"Loading ...", "0°", "OFF"}
+  {"Loading ...", "0°", "0°", "OFF"},
+  {"Loading ...", "0°", "0°", "OFF"}
 };
 
 typedef enum {
@@ -30,18 +31,21 @@ static GBitmap *s_res_up;
 static GBitmap *s_res_selector;
 static GBitmap *s_res_down;
 static GBitmap *s_res_thermometer;
-static GFont s_res_temperature_font;
+static GFont s_res_target_temperature_font;
+static GFont s_res_current_temperature_font;
 static GFont s_res_name_font;
 static GFont s_res_mode_font;
 static ActionBarLayer *action_bar_layer;
 static BitmapLayer *bitmap_layer;
-static TextLayer *temperature_layer;
+static TextLayer *current_temperature_layer;
+static TextLayer *target_temperature_layer;
 static TextLayer *name_layer;
 static TextLayer *mode_layer;
 
 // Updates the UI with current data from the array of thermostats
 static void update_ui(void){
-  text_layer_set_text(temperature_layer, thermostats[selected_thermostat].temperature);
+  text_layer_set_text(current_temperature_layer, thermostats[selected_thermostat].currentTemperature);
+  text_layer_set_text(target_temperature_layer, thermostats[selected_thermostat].targetTemperature);
   text_layer_set_text(name_layer, thermostats[selected_thermostat].name);
   text_layer_set_text(mode_layer, thermostats[selected_thermostat].mode);
 }
@@ -50,7 +54,8 @@ static void update_ui(void){
 // Updates the array of thermostats with the received data
 static void receive_message(DictionaryIterator *iter, void *context) {
   Tuple *thermostat_name_tuple;
-  Tuple *thermostat_temperature_tuple;
+  Tuple *current_temperature_tuple;
+  Tuple *target_temperature_tuple;
   Tuple *thermostat_mode_tuple;
   Tuple *thermostat_index_tuple = dict_find(iter, MESSAGE_KEY_thermostatIndex);
   int i;
@@ -64,9 +69,14 @@ static void receive_message(DictionaryIterator *iter, void *context) {
         strcpy(thermostats[i].name, thermostat_name_tuple->value->cstring);
       }
 
-      thermostat_temperature_tuple = dict_find(iter, MESSAGE_KEY_thermostatTemperature);
-      if (thermostat_temperature_tuple) {
-        strcpy(thermostats[i].temperature, thermostat_temperature_tuple->value->cstring);
+      current_temperature_tuple = dict_find(iter, MESSAGE_KEY_currentTemperature);
+      if (current_temperature_tuple) {
+        strcpy(thermostats[i].currentTemperature, current_temperature_tuple->value->cstring);
+      }
+
+      target_temperature_tuple = dict_find(iter, MESSAGE_KEY_targetTemperature);
+      if (target_temperature_tuple) {
+        strcpy(thermostats[i].targetTemperature, target_temperature_tuple->value->cstring);
       }
 
       thermostat_mode_tuple = dict_find(iter, MESSAGE_KEY_thermostatMode);
@@ -162,7 +172,8 @@ static void initialize_ui(void) {
   s_res_selector = gbitmap_create_with_resource(RESOURCE_ID_SELECTOR);
   s_res_down = gbitmap_create_with_resource(RESOURCE_ID_DOWN);
   s_res_thermometer = gbitmap_create_with_resource(RESOURCE_ID_THERMOMETER);
-  s_res_temperature_font = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
+  s_res_current_temperature_font = fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD);
+  s_res_target_temperature_font = fonts_get_system_font(FONT_KEY_GOTHIC_24);
   s_res_name_font = fonts_get_system_font(FONT_KEY_GOTHIC_28);
   s_res_mode_font = fonts_get_system_font(FONT_KEY_GOTHIC_14);
 
@@ -185,13 +196,21 @@ static void initialize_ui(void) {
   bitmap_layer_set_bitmap(bitmap_layer, s_res_thermometer);
   layer_add_child(window_get_root_layer(s_window), (Layer *)bitmap_layer);
   
-  // temperature_layer
-  temperature_layer = text_layer_create(GRect(0, 15, DISPLAY_WIDTH-2, 45));
-  text_layer_set_background_color(temperature_layer, GColorClear);
-  text_layer_set_text_color(temperature_layer, GColorWhite);
-  text_layer_set_text_alignment(temperature_layer, GTextAlignmentRight);
-  text_layer_set_font(temperature_layer, s_res_temperature_font);
-  layer_add_child(window_get_root_layer(s_window), (Layer *)temperature_layer);
+  // current temperature_layer
+  current_temperature_layer = text_layer_create(GRect(0, 15, DISPLAY_WIDTH-2, 45));
+  text_layer_set_background_color(current_temperature_layer, GColorClear);
+  text_layer_set_text_color(current_temperature_layer, GColorWhite);
+  text_layer_set_text_alignment(current_temperature_layer, GTextAlignmentRight);
+  text_layer_set_font(current_temperature_layer, s_res_current_temperature_font);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)current_temperature_layer);
+
+  // target temperature_layer
+  target_temperature_layer = text_layer_create(GRect(0, 60, DISPLAY_WIDTH-2, 45));
+  text_layer_set_background_color(target_temperature_layer, GColorClear);
+  text_layer_set_text_color(target_temperature_layer, GColorWhite);
+  text_layer_set_text_alignment(target_temperature_layer, GTextAlignmentRight);
+  text_layer_set_font(target_temperature_layer, s_res_target_temperature_font);
+  layer_add_child(window_get_root_layer(s_window), (Layer *)target_temperature_layer);
   
   // name_layer
   name_layer = text_layer_create(GRect(2, PEBBLE_HEIGHT-60, DISPLAY_WIDTH-2, 60));
@@ -215,7 +234,8 @@ static void destroy_ui(void) {
   window_destroy(s_window);
   action_bar_layer_destroy(action_bar_layer);
   bitmap_layer_destroy(bitmap_layer);
-  text_layer_destroy(temperature_layer);
+  text_layer_destroy(current_temperature_layer);
+  text_layer_destroy(target_temperature_layer);
   text_layer_destroy(name_layer);
   gbitmap_destroy(s_res_up);
   gbitmap_destroy(s_res_selector);

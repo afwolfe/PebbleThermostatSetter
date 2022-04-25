@@ -31,7 +31,8 @@
       "thermostatId",
       "thermostatMode",
       "thermostatName",
-      "thermostatTemperature"
+      "currentTemperature",
+      "targetTemperature"
     ],
     "capabilities": [
       "configurable"

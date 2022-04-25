@@ -29,7 +29,6 @@ Pebble.addEventListener("ready", function(e) {
     endpoints = config.endpoints;
     modes = config.modes;
 
-    if (DEBUG > 0) { console.log("Initializing thermostat data ..."); }
     initializeThermostatData();
 });
 
@@ -178,7 +177,6 @@ function sendThermostatData(thermostatData) {
 
 // Gets the values object of a thermostat
 // Resolve returns the temperature and other info.
-// Reject returns a status code
 function getThermostatValues(thermostatId) {
     var endpoint = prepareToCallEndpoint("getThermostat", thermostatId);
 
@@ -210,11 +208,6 @@ function getThermostatValues(thermostatId) {
         });
     });
 }
-
-
-// Gets the temperature of a thermostat
-// Resolve returns the temperature
-// Reject returns a status code
 
 // Sets the temperature of a thermostat
 function setTemperature(thermostatId, characteristicType, value){
@@ -304,6 +297,7 @@ function loginIfNecessary(){
 
 // Initializes the thermostat data with login response data
 function initializeThermostatData(){
+    if (DEBUG > 0) { console.log("Initializing thermostat data ..."); }
     loginIfNecessary().then(function() { // resolve login
         var thermostatsCount = thermostats.length;
 

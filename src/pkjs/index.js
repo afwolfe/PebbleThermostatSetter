@@ -98,6 +98,7 @@ function changeTemperature(thermostatIndex, temperatureChange){
                         .catch(function(data) {
                             if (DEBUG > 0) { console.error("Error setting temperature."); }
                             thermostatData.thermostatName = "Error";
+                            thermostatData.command = COMMAND_FAILURE;
                             return thermostatData;
                         })
                         .finally(function() {
@@ -119,6 +120,7 @@ function changeTemperature(thermostatIndex, temperatureChange){
         .catch(function(data) { // reject getTemperature
             if (DEBUG > 0) { console.error("Error getting temperature."); }
             thermostatData.thermostatName = "Error";
+            thermostatData.command = COMMAND_FAILURE;
             sendThermostatData(thermostatData);
         });
     });
@@ -144,6 +146,7 @@ function changeMode(thermostatIndex){
                     if (DEBUG > 0) { console.error("Error setting mode."); }
                     thermostatData.thermostatMode = modes[currentMode];
                     thermostatData.thermostatName = "Error";
+                    thermostatData.command = COMMAND_FAILURE;
                     return thermostatData;
                 })
                 .finally(function() {
@@ -157,6 +160,7 @@ function changeMode(thermostatIndex){
         .catch(function(data) {
             if (DEBUG > 0) { console.error("Error getting mode."); }
             thermostatData.thermostatName = "Error";
+            thermostatData.command = COMMAND_FAILURE;
             sendThermostatData(thermostatData);
         });
     });
@@ -173,7 +177,9 @@ function sendThermostatData(thermostatData) {
         if (thermostatData.hasOwnProperty("thermostatId")) { // Never send ID
             delete thermostatData.thermostatId;
         }
-        thermostatData.command = COMMAND_SUCCESS;
+        if (!thermostatData.hasOwnProperty("command")) { // If command not set, assume success.
+            thermostatData.command = COMMAND_SUCCESS;
+        }
         MessageQueue.sendAppMessage(thermostatData);
     }
 }
@@ -328,6 +334,8 @@ function initializeThermostatData(){
                         })
                         .catch(function(data) {
                             if (DEBUG > 0) { console.error("Error getting thermostat information for " + thermostatData["thermostatId"]); }
+                            thermostatData.command = COMMAND_FAILURE;
+                            sendThermostatData(thermostatData);
                         });
                 }.bind(null,thermostatData), 1000);
             }

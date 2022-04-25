@@ -12,6 +12,8 @@ const config = require("./config.js");
 // Command Enums
 const COMMAND_TEMP_CHANGE = 0;
 const COMMAND_MODE_CHANGE = 1;
+const COMMAND_SUCCESS     = 2;
+const COMMAND_FAILURE     = 3;
 
 const DEBUG = 0;
 
@@ -171,6 +173,7 @@ function sendThermostatData(thermostatData) {
         if (thermostatData.hasOwnProperty("thermostatId")) { // Never send ID
             delete thermostatData.thermostatId;
         }
+        thermostatData.command = COMMAND_SUCCESS;
         MessageQueue.sendAppMessage(thermostatData);
     }
 }

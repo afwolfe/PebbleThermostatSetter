@@ -20,8 +20,26 @@ struct thermostat thermostats[MAX_THERMOSTATS] = {
 
 typedef enum {
   TEMP_CHANGE,
-  MODE_CHANGE
+  MODE_CHANGE,
+  SUCCESS,
+  FAILURE,
 } Commands;
+
+
+VibePattern short_vibe = { 
+    .durations = (uint32_t []) {50},
+    .num_segments = 1,};
+VibePattern long_vibe = { 
+    .durations = (uint32_t []) {40,40,40},
+    .num_segments = 3,};
+VibePattern overflow_vibe = { 
+    .durations = (uint32_t []) {40,100,40},
+    .num_segments = 3,};
+
+#define SHORT_VIBE() if(!quiet_time_is_active()) { vibes_enqueue_custom_pattern(short_vibe); }
+#define LONG_VIBE() if(!quiet_time_is_active()) { vibes_enqueue_custom_pattern(long_vibe); }
+#define OVERFLOW_VIBE() if(!quiet_time_is_active()) { vibes_enqueue_custom_pattern(overflow_vibe); }
+
 
 // The currently selected thermostat
 static int selected_thermostat = 0;
@@ -43,29 +61,43 @@ static TextLayer *name_layer;
 static TextLayer *mode_layer;
 
 // Updates the UI with current data from the array of thermostats
-static void update_ui(void){
+static void update_ui(void) {
   text_layer_set_text(current_temperature_layer, thermostats[selected_thermostat].currentTemperature);
   text_layer_set_text(target_temperature_layer, thermostats[selected_thermostat].targetTemperature);
   text_layer_set_text(name_layer, thermostats[selected_thermostat].name);
   text_layer_set_text(mode_layer, thermostats[selected_thermostat].mode);
 }
 
+static void handle_success() {
+  window_set_background_color(s_window, GColorBlack);
+  layer_mark_dirty(window_get_root_layer(s_window));
+  SHORT_VIBE();
+}
+
+static void handle_failure() {
+  window_set_background_color(s_window,GColorDarkGray);
+  layer_mark_dirty(window_get_root_layer(s_window));
+  LONG_VIBE();
+}
+
+
 // Process the message received in the watch from the phone
 // Updates the array of thermostats with the received data
 static void receive_message(DictionaryIterator *iter, void *context) {
+  Tuple *command_tuple = dict_find(iter, MESSAGE_KEY_command);
+  Tuple *thermostat_index_tuple = dict_find(iter, MESSAGE_KEY_thermostatIndex);
   Tuple *thermostat_name_tuple;
   Tuple *current_temperature_tuple;
   Tuple *target_temperature_tuple;
   Tuple *thermostat_mode_tuple;
-  Tuple *thermostat_index_tuple = dict_find(iter, MESSAGE_KEY_thermostatIndex);
   int i;
 
-  if (thermostat_index_tuple){
+  if (thermostat_index_tuple) {
     i = thermostat_index_tuple->value->uint8;
-    if (i < MAX_THERMOSTATS){ // Make sure the array does not overflow
+    if (i < MAX_THERMOSTATS) { // Make sure the array does not overflow
 
       thermostat_name_tuple = dict_find(iter, MESSAGE_KEY_thermostatName);
-      if (thermostat_name_tuple){
+      if (thermostat_name_tuple) {
         strcpy(thermostats[i].name, thermostat_name_tuple->value->cstring);
       }
 
@@ -83,9 +115,21 @@ static void receive_message(DictionaryIterator *iter, void *context) {
       if (thermostat_mode_tuple) {
         strcpy(thermostats[i].mode, thermostat_mode_tuple->value->cstring);
       }
-
-      update_ui();
     }
+    if (command_tuple) {
+      switch (command_tuple->value->uint8) {
+        case SUCCESS:
+          handle_success();
+          break;
+        case FAILURE:
+          handle_failure();
+          break;
+        default:
+          break;
+      }
+
+    }
+    update_ui();
   }
 }
 
@@ -143,6 +187,7 @@ static void select_click_handler(ClickRecognizerRef recognizer, void *context) {
 static void select_long_click_handler(ClickRecognizerRef recognizer, void *context) {
   // Changes the selected thermostat and updates the UI.
   selected_thermostat = (selected_thermostat + 1) % MAX_THERMOSTATS;
+  OVERFLOW_VIBE();
   update_ui();
 }
 

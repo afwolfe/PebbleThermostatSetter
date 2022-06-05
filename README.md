@@ -20,74 +20,7 @@ pebble install --logs
 
 ## Configuration
 
-Example: 
-
-```json
-var self = module.exports = {
-  baseUrl: "http://server",
-  thermostats: [
-    {"id": "",
-    "name": ""
-    }
-  ],
-  modes: {
-    0: "OFF",
-    1: "HEAT",
-    2: "COOL",
-    3: "AUTO"
-  },
-  values: {
-    "CurrentHeatingCoolingState": "CurrentHeatingCoolingState",
-    "TargetHeatingCoolingState": "TargetHeatingCoolingState",
-    "CurrentTemperature": "CurrentTemperature",
-    "TemperatureDisplayUnits": "TemperatureDisplayUnits",
-    "HeatingThresholdTemperature": "HeatingThresholdTemperature",
-    "CoolingThresholdTemperature": "CoolingThresholdTemperature",
-    "TargetTemperature": "TargetTemperature"
-  },
-  unit: "c",
-  endpoints: {
-    "getThermostat": {
-      "method": "GET",
-      "url": "/api/accessories/${ThermostatId}",
-      "headers": {},
-      "values": "values"
-    },
-    "setTemperature": {
-      "method": "PUT",
-      "url": "/api/accessories/${ThermostatId}",
-      "headers": {"Content-Type": "application/json"},
-      "body": {
-        "characteristicType": "TargetTemperature",
-        "value": "${TargetTemperature}"
-      }
-    },
-    "getMode": {
-      "method": "GET",
-      "url": "/api/accessories/${ThermostatId}",
-      "values": "values"
-    },
-    "setMode": {
-      "method": "PUT",
-      "url": "/api/accessories/${ThermostatId}",
-      "headers": {"Content-Type": "application/json"},
-      "body": {
-        "characteristicType": "TargetHeatingCoolingState",
-        "value": "${TargetHeatingCoolingState}"
-      }
-    },
-    "login": {
-      "method": "POST",
-      "url": "/api/auth/login",
-      "body": {},
-      "headers": {
-        "Content-Type": "application/json"
-      },
-      "value": "access_token"
-    }
-  }
-};
-```
+See [config.js.dist](src/pkjs/config.js.dist) for an example and instructions.
 
 ## Usage
 ## Features
@@ -96,7 +29,7 @@ var self = module.exports = {
 * [x] Display a "current" and "target" temperature
 * [x] Display and control the thermostat "mode." 
 * [ ] Setting heating/cooling threshold in "AUTO" mode.
-* [ ] Color and vibration feedback on request success/failures.
+* [x] Color and vibration feedback on request success/failures.
 * [ ] Dynamic config page similar to Stateful/[kennedn's fork of clay](https://github.com/kennedn/clay)
 
 ## Acknowledgements

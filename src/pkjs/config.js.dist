@@ -1,0 +1,64 @@
+var self = module.exports = {
+  baseUrl: "http://server",
+  thermostats: [ // A comma-separated list of thermostats containing their ID and name
+    {"id": "",
+    "name": ""
+    }
+  ],
+  modes: { // The supported modes of the thermostat, not all support "AUTO"
+    0: "OFF",
+    1: "HEAT",
+    2: "COOL",
+    3: "AUTO"
+  },
+  values: { // These keys are used in the responses of homebridge-ui-x, change the values on the right if the API is different.
+    "CurrentHeatingCoolingState": "CurrentHeatingCoolingState",
+    "TargetHeatingCoolingState": "TargetHeatingCoolingState",
+    "CurrentTemperature": "CurrentTemperature",
+    "TemperatureDisplayUnits": "TemperatureDisplayUnits",
+    "HeatingThresholdTemperature": "HeatingThresholdTemperature",
+    "CoolingThresholdTemperature": "CoolingThresholdTemperature",
+    "TargetTemperature": "TargetTemperature"
+  },
+  unit: "c",
+  endpoints: {
+    "getThermostat": {
+      "method": "GET",
+      "url": "/api/accessories/${ThermostatId}",
+      "headers": {},
+      "values": "values"
+    },
+    "setTemperature": {
+      "method": "PUT",
+      "url": "/api/accessories/${ThermostatId}",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "characteristicType": "TargetTemperature",
+        "value": "${TargetTemperature}"
+      }
+    },
+    "getMode": {
+      "method": "GET",
+      "url": "/api/accessories/${ThermostatId}",
+      "values": "values"
+    },
+    "setMode": {
+      "method": "PUT",
+      "url": "/api/accessories/${ThermostatId}",
+      "headers": {"Content-Type": "application/json"},
+      "body": {
+        "characteristicType": "TargetHeatingCoolingState",
+        "value": "${TargetHeatingCoolingState}"
+      }
+    },
+    "login": {
+      "method": "POST",
+      "url": "/api/auth/login",
+      "body": {},
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "value": "access_token"
+    }
+  }
+};
